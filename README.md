@@ -29,7 +29,7 @@ The Max-Relevance-Min-Redundancy consists therefore on
 
 <img src="https://render.githubusercontent.com/render/math?math=max (\phi(D, R))">.
 
-The computation is performed incrementally, starting from the feature that shows larger mutual information with the *y*, and selecting the <img src="https://render.githubusercontent.com/render/math?math=m^{th}"> feature from the set <img src="https://render.githubusercontent.com/render/math?math={X - S_{m-1}}"> that minimize <img src="https://render.githubusercontent.com/render/math?math=\phi">:
+The computation is performed incrementally, starting from the feature that shows larger mutual information with the *y*, and then selecting the <img src="https://render.githubusercontent.com/render/math?math=m^{th}"> feature from the set <img src="https://render.githubusercontent.com/render/math?math={X - S_{m-1}}"> that minimize <img src="https://render.githubusercontent.com/render/math?math=\phi">:
 
 <img src="https://render.githubusercontent.com/render/math?math=max_{x_j \in X - S_{m - 1}} [ I(x_i, y) - \frac{1}{m-1} \sum_{x_i \in X - S_{m - 1}} I(x_i, x_j) ] ">. <br/>
 
