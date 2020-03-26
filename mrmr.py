@@ -1,168 +1,146 @@
 import numpy as np
 from operator import itemgetter
-
-from directarray.featureselection.featureselectionbase import FeatureFilterBase
-from directarray.stats.information_metrics import InformationMetrics
+from utils.information_metrics import *
 
 
-class MRMR(FeatureFilterBase):
+class MRMR():
     """
-    This class extends the directarray FeatureFilterBase and implements the
-    MRMR algorithm for feature-selection: http://ieeexplore.ieee.org/document/1453511/
+    This class implements the mRMR algorithm for feature-selection presented
+    by Peng et al. in http://ieeexplore.ieee.org/document/1453511/
 
 
-    :param n_features: int (default=20)
-        Number of feature to select. If None are provided, then all the
-        features that are available are ranked/ordered.
+    Arguments
+    ----------
 
-    :param method: str {'MID', 'MIQ'} (fefault='MIQ')
-        Two most used mRMR schemes: MID and MIQ represent the Mutual Information
-        Difference and Quotient schemes, respectively, to combine the relevance
-        and redundancy that are defined using mutual information.
+    n_features : int (default=20), number of feature to select. If None are
+        provided, then all the features that are available are ranked/ordered.
 
-    :param k_max: int (default=None)
-        The maximum number of top-scoring features to consider.
-        If None is provided, then all the features that are available are consider.
+    k_max : int (default=None), the maximum number of top-scoring features to
+        consider. If None is provided, then all the features that are available
+        are consider.
 
-
-    Example:
-    >>> from directarray.datastructures.dataset import DataSet
-    >>> from directarray.featureselection.mrmr import MRMR
-    >>> data_A = [[1, 1, 0, 1, 1, 1, 2, 1, 1, 1],
-    ...           [4, 1, 0, 1, 1, 0, 1, 1, 1, 2],
-    ...           [1, 2, 1, 2, 1, 1, 2, 2, 0, 2],
-    ...           [4, 1, 0, 1, 3, 2, 0, 1, 1, 1],
-    ...           [1, 2, 1, 2, 1, 1, 1, 2, 1, 0],
-    ...           [3, 1, 1, 2, 0, 0, 0, 0, 0, 1],
-    ...           [1, 0, 1, 2, 1, 1, 1, 1, 2, 1]]
-    >>> data_B = [[0, 1, 11, 1, 2, 1, 2, 1, 1, 1],
-    ...           [1, 1, 12, 1, 1, 0, 1, 1, 2, 1],
-    ...           [2, 1, 11, 0, 5, 1, 1, 2, 1, 0],
-    ...           [1, 2, 10, 1, 3, 2, 2, 1, 2, 1],
-    ...           [2, 1, 11, 2, 1, 1, 1, 0, 1, 0],
-    ...           [1, 2, 10, 2, 5, 1, 0, 2, 0, 1],
-    ...           [1, 1, 12, 3, 1, 1, 1, 1, 1, 1]]
-    >>> dset_A = DataSet.generate_from_array(np.asarray(data_A), ds_name="dataset A")
-    >>> dset_B = DataSet.generate_from_array(np.asarray(data_B), ds_name="dataset B")
-
-    >>> feature_filter = MRMR(n_features=2)
-    >>> feature_filter.add_trainingdata(dset_A, "A")
-    >>> feature_filter.add_trainingdata(dset_B, "B")
-    >>> feature_filter.select()
-    ['feature_3', 'feature_5']
     """
 
-    def __init__(self, n_features=20, method='MID', k_max=None):
-
-        super(MRMR, self).__init__()
-        self.MRMR = None
-
+    def __init__(self, n_features=20, k_max=None):
         self.n_features = n_features
-
-        if method not in ('MID', 'MIQ'):
-            raise ValueError("method must be one of 'MID', MIQ'.")
-
-        self.method = method
         self.k_max = k_max
 
-    def _prepare_data(self, key_list=None):
+    @staticmethod
+    def _mutual_information_target(X, y):
         """
-        Preprocessing function to convert DataSet to numpy array data structure.
+        Calculate mutual informaton between each column vector of the feature
+        matrix X and target vector y.
+
+
+        Parameters
+        ----------
+        X : numpy array, feature matrix
+        y : numpy array, target vector
+
+        Returns
+        -------
+        res : list of tuples (idx, val), where idx is the index of the feature
+                vector with respect to the feature matrix X, and val is the the
+                mutual information value. The list is sorted in ascending order
+                with respect to mutual information value.
+
         """
 
-        datamatrix = []
-        class_names = []
+        mi_vec = []
+        for x in X.T:
+            mi_vec.append(mutual_information(x, y))
 
-        sample_keys = None
-        if key_list is None:
-            sample_keys = self.training_set[0]['data'].get_keys()
+        return sorted(enumerate(mi_vec), key=itemgetter(1), reverse=True)
+
+    def _handle_fit(self, X, y, threshold=0.8):
+        """ handler method for fit """
+
+        ndim = X.shape[1]
+        if self.k_max:
+            k_max = min(ndim, self.k_max)
         else:
-            sample_keys = key_list
+            k_max = ndim
 
-        for idx, data in enumerate(self.training_set):
-            name = data["name"]
-            samples = data["data"]
+        ## TODO: set k_max
+        k_max = ndim
 
-            for smp in samples:
-                vec = []
-                for k in sample_keys:
-                    vec.append(smp[k])
-
-                datamatrix.append(vec)
-                class_names.append(name)
-
-        np_data = np.array(datamatrix)
-        y = np.searchsorted(np.sort(np.unique(class_names)), class_names)
-
-        return np_data, y, sample_keys
-
-    def _handle_selection(self, training_set, validation_set, *args, **kwargs):
-        """
-
-        :param training_set: DataSetVector|list, the training set
-        :param validation_set: unused
-        :param args: additional positional arguments
-        :param kwargs: additional keyword arguments
-        :return: list, A vector of indices sorted in descending order, where each index
-                 represents the importance of the feature, as computed by the MRMR algorithm.
-
-        :return:
-        """
-        self.training_set = training_set
-
-        np_data, y, keys = self._prepare_data()
-        num_dim = np_data.shape[1]
-
-        k_max = min(num_dim, self.k_max)
-
-        # calculate mutual mutual informaton between features and target
-        MI_t = []
-        for x in np_data.T:
-            MI_t.append(InformationMetrics.mutual_information(x, y))
-
-        MI_vals = sorted(enumerate(MI_t), key=itemgetter(1), reverse=True)
+        # mutual informaton between feature fectors and target vector
+        MI_trg_map = self._mutual_information_target(X, y)
 
         # subset the data down to k_max
-        sorted_mi_idxs = [i[0] for i in MI_vals]
-        np_data_subset = np_data[:, sorted_mi_idxs[0:k_max]]
+        sorted_MI_idxs = [i[0] for i in MI_trg_map]
+        X_subset = X[:, sorted_MI_idxs[0:k_max]]
+
+        # mutual information within feature vectors
+        MI_features_map = {}
 
         # Max-Relevance first feature
-        idx, MaxRel = MI_vals[0]
+        idx0, MaxRel = MI_trg_map[0]
 
-        MI_vars = {}
-        MI_vars[idx] = []
-        for x in np_data_subset.T:
-            MI_vars[idx].append(InformationMetrics.mutual_information(x, np_data_subset[:, idx]))
+        mrmr_map = [(idx0, MaxRel)]
+        idx_mask = [idx0]
 
-        threshold = 0.8
+        MI_features_map[idx0] = []
+        for x in X_subset.T:
+            MI_features_map[idx0].append(mutual_information(x, X_subset[:, idx0]))
 
-        # find related values
-        related = sorted(((i, v) for i, v in enumerate(MI_vars[idx]) if v > threshold and i != idx), key=itemgetter(1), reverse=True)
+        for _ in range(min(self.n_features - 1, ndim - 1)):
 
-        mrmr_vals = [(idx, MaxRel, related)]
+            # objective func
+            phi_vec = []
+            for idx, Rel in MI_trg_map[1:k_max]:
+                if idx not in idx_mask:
+                    Red = sum(MI_features_map[j][idx] for j, _ in mrmr_map) / len(mrmr_map)
+                    phi = (Rel - Red)
+                    phi_vec.append((idx, phi))
 
-        mask_idxs = [idx]
-        for k in range(min(self.n_features - 1, num_dim - 1)):
-            idx, MaxRel, mrmr = max(((
-                  idx, MaxRel,
-                  np.nan_to_num(MaxRel - sum(MI_vars[j][idx] for j, _, _ in mrmr_vals) / len(mrmr_vals)) if self.method == 'MID' else
-                  np.nan_to_num(MaxRel / sum(MI_vars[j][idx] for j, _, _ in mrmr_vals) / len(mrmr_vals)))
-                for idx, MaxRel in MI_vals[1:] if idx not in mask_idxs), key=itemgetter(2))
+            idx, mrmr_val = max(phi_vec, key=itemgetter(1))
 
-            MI_vars[idx] = []
-            for x in np_data_subset.T:
-                MI_vars[idx].append(InformationMetrics.mutual_information(x, np_data_subset[:, idx]))
+            MI_features_map[idx] = []
+            for x in X_subset.T:
+                MI_features_map[idx].append(mutual_information(x, X_subset[:, idx]))
 
-            # find related values
-            related = sorted(((i, v) for i, v in enumerate(MI_vars[idx]) if v > threshold and i != idx), key=itemgetter(1), reverse=True)
+            mrmr_map.append((idx, mrmr_val))
+            idx_mask.append(idx)
 
-            mrmr_vals.append((idx, mrmr, related))
-            mask_idxs.append(idx)
+        mrmr_map_sorted = sorted(mrmr_map, key=itemgetter(1), reverse=True)
+        return [x[0] for x in mrmr_map_sorted]
 
-        mrmr_vals_sorted = sorted(mrmr_vals, key=itemgetter(1), reverse=True)
-        mrmr_vals_sorted_ = mrmr_vals_sorted[:self.n_features]
+    def fit(self, X, y, threshold=0.8):
+        """
+        fit method.
 
-        sel_idx = [x[0] for x in mrmr_vals_sorted_]
-        sel_keys = [keys[idx] for idx in sel_idx]
 
-        return sel_keys
+        Parameters
+        ----------
+        X : numpy array, discretized data
+        y : numpy array or list, class labels
+        threshold : float (default=0.8), controls the mutual informaton whithin
+            feature vectors.
+
+        Raise
+        ----------
+        ValueError : if X is not of type numpy.ndarray.
+        ValueError : if y is not of type numpy.ndarray or list.
+        ValueError : if threshold is not between 0 and 1.
+
+        Returns
+        ----------
+        matrix : numpy array of size (X.size, n_features),
+            containing selected feature vectors
+
+        """
+
+        if type(X) != np.ndarray:
+            raise ValueError('X must be of type numpy array.')
+
+        if type(y) != np.ndarray:
+            if type(y) == list:
+                y = np.array(y)
+            else:
+                raise ValueError('y must be of type numpy array or list.')
+
+        if not 0.0 < threshold < 1.0:
+            raise ValueError('threshold value must be between o and 1.')
+
+        return self._handle_fit(X, y, threshold)
