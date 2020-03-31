@@ -1,6 +1,6 @@
 # mRMR
 Information based feature selection algorithm based on the mutual information criteria of
-max-relevance and min-redundancy presented by Peng et al. in by Peng et al.
+max-relevance and min-redundancy presented by Peng *et al.* in by Peng et al.
 in http://ieeexplore.ieee.org/document/1453511/. <br/>
 <br/>
 Because the algorithm makes use of information metric functions, such as Shanon Entropy, it requires discretized data.
@@ -32,4 +32,17 @@ The Max-Relevance-Min-Redundancy consists therefore on
 The computation is performed incrementally, starting from the feature that shows larger mutual information with the *y*, and then selecting the <img src="https://render.githubusercontent.com/render/math?math=m^{th}"> feature from the set <img src="https://render.githubusercontent.com/render/math?math={X - S_{m-1}}"> that minimize <img src="https://render.githubusercontent.com/render/math?math=\phi">:
 
 <img src="https://render.githubusercontent.com/render/math?math=max_{x_j \in X - S_{m - 1}} [ I(x_i, y) - \frac{1}{m-1} \sum_{x_i \in X - S_{m - 1}} I(x_i, x_j) ] ">. <br/>
+
+
+# Usage
+
+```
+from mrmr import MRMR
+
+selection = MRMR(n_features=5)
+indices = selection.fit(X, y)
+
+X_selection = X[:, indices]
+
+```
 
